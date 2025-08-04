@@ -1,0 +1,55 @@
+<!-- index.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Murmind</title>
+  <script src="/static/script.js" defer></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 2em auto;
+      padding: 1em;
+    }
+    input, select, button {
+      padding: 0.5em;
+      margin: 0.3em 0;
+      width: 100%;
+      font-size: 1em;
+    }
+    audio {
+      margin-top: 1em;
+      width: 100%;
+    }
+    .error {
+      color: red;
+      margin-top: 1em;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 Murmind</h1>
+
+  <form id="promptForm">
+    <label for="model">Choose model:</label>
+    <select name="model" id="model">
+      {% for m in models %}
+        <option value="{{ m }}">{{ m }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="prompt">Enter your message:</label>
+    <input type="text" id="prompt" name="prompt" placeholder="Type your question..." required>
+
+    <button type="submit">Ask</button>
+  </form>
+
+  <div id="result">
+    <p id="responseText"></p>
+    <audio id="audioPlayer" controls style="display:none;"></audio>
+    <p id="errorMessage" class="error"></p>
+  </div>
+</body>
+</html>
