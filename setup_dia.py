@@ -3,20 +3,21 @@
 import os
 import subprocess
 import sys
-from pathlib import Path
+import shutil
 from huggingface_hub import hf_hub_download
 
-DIA_DIR = Path("dia_tts")
-MODEL_NAME = "dia-model.pth"
-MODEL_FILE = DIA_DIR / "weights" / MODEL_NAME
+DIA_DIR = "dia_tts"
+MODEL_FILENAME = "dia-v0_1.pth"
+REPO_ID = "nari-labs/Dia-1.6B"
+MODEL_FILE = os.path.join(DIA_DIR, "weights", MODEL_FILENAME)
 
-# Klonar Dia från Hugging Face repo om den inte redan finns
+# Klonar Dia från GitHub om den inte redan finns
 def clone_dia():
-    if DIA_DIR.exists():
+    if os.path.exists(DIA_DIR):
         print("✅ Dia already cloned.")
         return
-    print("📥 Cloning Dia from Hugging Face...")
-    subprocess.run(["git", "clone", "git@huggingface.co:nari-labs/dia.git", str(DIA_DIR)], check=True)
+    print("📥 Cloning Dia from GitHub...")
+    subprocess.run(["git", "clone", "https://github.com/nari-labs/dia.git", DIA_DIR], check=True)
 
 # Installerar nödvändiga Python-paket direkt (ingen requirements.txt behövs)
 def install_dependencies():
@@ -34,25 +35,23 @@ def install_dependencies():
     ]
     subprocess.run([sys.executable, "-m", "pip", "install"] + pip_packages, check=True)
 
-# Laddar ner modellen via huggingface_hub med autentisering
+# Laddar ner Dia-modellen via Hugging Face Hub
 def download_model():
-    if MODEL_FILE.exists():
+    if os.path.exists(MODEL_FILE):
         print("✅ Dia model already exists.")
         return
 
     print("🌐 Downloading Dia model weights (~6 GB)...")
+    os.makedirs(os.path.dirname(MODEL_FILE), exist_ok=True)
+
     try:
-        # Hämta till DIA_DIR/weights utan symlink
-        model_path = hf_hub_download(
-            repo_id="nari-labs/dia",
-            filename=MODEL_NAME,
-            local_dir=str(DIA_DIR / "weights"),
-            local_dir_use_symlinks=False
-        )
-        print(f"✅ Model downloaded to: {model_path}")
+        model_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME)
+        shutil.copy(model_path, MODEL_FILE)
+        print("✅ Model downloaded and copied to weights folder.")
     except Exception as e:
         print("❌ Failed to download Dia model.")
-        print("📌 You may need to run `huggingface-cli login` or add SSH access.")
+        print("📌 Make sure you are logged in to Hugging Face CLI.")
+        print(f"👉 https://huggingface.co/{REPO_ID}/blob/main/{MODEL_FILENAME}")
         raise e
 
 # Kör hela setup-processen
