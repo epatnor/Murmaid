@@ -1,5 +1,5 @@
 @echo off
-:: start_murmind.bat
+:: start_murmaid.bat
 
 set VENV_DIR=.venv
 
