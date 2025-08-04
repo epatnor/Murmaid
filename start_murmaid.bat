@@ -8,6 +8,10 @@ echo ============================================
 echo 🧜‍♀️  Murmaid – Local AI voice assistant
 echo ============================================
 
+:: Pull latest changes from GitHub
+echo 🔄 Checking for updates from GitHub...
+git pull
+
 :: Check if Python is installed
 where python >nul 2>nul
 if errorlevel 1 (
