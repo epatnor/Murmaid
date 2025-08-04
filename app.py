@@ -7,18 +7,22 @@ from fastapi.templating import Jinja2Templates
 import subprocess
 import uuid
 import shutil
+import os
+
 from dia_wrapper import generate_audio
 
-# Starta FastAPI och mounta statiska filer
+# 🚀 Start FastAPI
 app = FastAPI()
+
+# 🔧 Static & templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Kontrollera att Ollama är installerat
+# ✅ Kontrollera att Ollama finns
 if shutil.which("ollama") is None:
     raise RuntimeError("❌ Ollama is not installed or not in PATH. Install it from https://ollama.com")
 
-# Funktion för att hämta listan över lokalt nedladdade modeller
+# 📦 Hämta lokalt installerade Ollama-modeller
 def get_local_ollama_models():
     try:
         result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
@@ -32,20 +36,23 @@ def get_local_ollama_models():
         print("⚠️ Failed to query Ollama:", e)
         return []
 
-# Root-route med modellval i frontend
+# 🌐 Root-endpoint – laddar UI med lista över modeller
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     models = get_local_ollama_models()
     return templates.TemplateResponse("index.html", {"request": request, "models": models})
 
-# Endpoint som hanterar prompt och vald modell
+# 🤖 Hanterar prompt + TTS-svar
 @app.post("/talk")
 async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)):
     available_models = get_local_ollama_models()
     if model not in available_models:
-        return JSONResponse(status_code=400, content={"error": f"Model '{model}' is not available locally. Please pull it first using 'ollama pull {model}'."})
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Model '{model}' is not available locally. Please run: ollama pull {model}"}
+        )
 
-    # Skicka prompt till Ollama
+    # 🧠 Skicka prompt till vald Ollama-modell
     try:
         import ollama
         response = ollama.chat(model=model, messages=[{"role": "user", "content": prompt}])
@@ -53,13 +60,16 @@ async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Ollama error: {str(e)}"})
 
-    # Generera ljud från svaret
+    # 🔊 Generera ljud via Dia
     filename = f"audio_{uuid.uuid4().hex}.wav"
     generate_audio(reply_text, filename)
 
     return {"text": reply_text, "audio_url": f"/audio/{filename}"}
 
-# Endpoint för att hämta ljudfil
+# 🎧 Endpoint för ljuduppspelning
 @app.get("/audio/{filename}")
 async def get_audio(filename: str):
-    return FileResponse(filename, media_type="audio/wav")
+    filepath = os.path.join(".", filename)
+    if not os.path.isfile(filepath):
+        return JSONResponse(status_code=404, content={"error": "File not found."})
+    return FileResponse(filepath, media_type="audio/wav")
