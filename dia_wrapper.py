@@ -4,18 +4,20 @@ import subprocess
 import os
 import sys
 
-# Importera setup-funktion om vi behöver installera Dia
+# Importerar och kör setup om Dia inte finns
 def ensure_dia_ready():
     if not os.path.isdir("dia_tts"):
-        print("🛠 Dia not found, running setup...")
+        print("🔧 Dia not found. Starting first-time setup...")
         try:
             import setup_dia
             setup_dia.setup_dia()
         except Exception as e:
-            print("❌ Failed to set up Dia:", e)
+            print(f"❌ Dia setup failed: {e}")
             sys.exit(1)
+    else:
+        print("✅ Dia is ready.")
 
-# Genererar ljud med Dia baserat på text
+# Genererar ljud från text via Dia
 def generate_audio(text, output_filename):
     ensure_dia_ready()
 
@@ -23,17 +25,18 @@ def generate_audio(text, output_filename):
     script_path = os.path.join("dia_tts", "dialog.txt")
     output_path = os.path.abspath(output_filename)
 
-    # Spara texten till fil
+    print(f"📝 Writing dialog to {script_path}")
     with open(script_path, "w", encoding="utf-8") as f:
         f.write(script)
 
-    # Kör Dia via CLI
+    print("🗣️ Running Dia inference...")
     try:
         subprocess.run([
             "python", "app.py",
             "--script", "dialog.txt",
             "--output", output_filename
         ], cwd="dia_tts", check=True)
+        print(f"✅ Audio generated: {output_path}")
     except subprocess.CalledProcessError as e:
-        print("❌ Failed to run Dia:", e)
+        print("❌ Dia execution failed:", e)
         raise
