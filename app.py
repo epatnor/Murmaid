@@ -56,7 +56,10 @@ async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)
     try:
         import ollama
         response = ollama.chat(model=model, messages=[{"role": "user", "content": prompt}])
-        reply_text = response['message']['content']
+        if isinstance(response, dict) and "message" in response:
+            reply_text = response["message"]["content"]
+        else:
+            return JSONResponse(status_code=500, content={"error": f"Invalid response from Ollama: {response}"})
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Ollama error: {str(e)}"})
 
