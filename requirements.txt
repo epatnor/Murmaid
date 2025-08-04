@@ -1,5 +1,16 @@
+# requirements.txt
+
 fastapi
 uvicorn
 jinja2
 ollama
 python-multipart
+huggingface_hub
+torch
+torchaudio
+transformers
+einops
+librosa
+soundfile
+scipy
+accelerate
