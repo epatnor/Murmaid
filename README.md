@@ -41,6 +41,8 @@
 
 1. **Clone this repository**
 
+⚠️ On first run, Murmind will automatically download and set up Dia (~6 GB). Make sure you have a stable internet connection.
+
 ```bash
 git clone https://github.com/epatnor/murmind.git
 cd murmind
