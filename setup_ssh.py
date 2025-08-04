@@ -4,15 +4,15 @@ import os
 import subprocess
 from pathlib import Path
 
-# Kommentar: Definiera sökvägar
+# Define SSH paths
 ssh_dir = Path.home() / ".ssh"
 ssh_key = ssh_dir / "hf_ed25519"
 ssh_config = ssh_dir / "config"
 
-# Kommentar: Skapa .ssh-mappen om den inte finns
+# Create .ssh directory if it doesn't exist
 ssh_dir.mkdir(parents=True, exist_ok=True)
 
-# Kommentar: Skriv SSH-konfiguration för Hugging Face
+# Hugging Face SSH config block
 huggingface_config = """
 Host huggingface.co
     HostName huggingface.co
@@ -21,38 +21,41 @@ Host huggingface.co
     IdentitiesOnly yes
 """
 
-# Kommentar: Lägg till config (eller uppdatera om det redan finns)
+# Write or append to config
 if ssh_config.exists():
     with ssh_config.open("r", encoding="utf-8") as f:
         contents = f.read()
     if "Host huggingface.co" not in contents:
         with ssh_config.open("a", encoding="utf-8") as f:
             f.write("\n" + huggingface_config.strip() + "\n")
-        print("✅ Hugging Face konfig tillagd i .ssh/config.")
+        print("✅ Hugging Face entry added to .ssh/config.")
     else:
-        print("ℹ️ Hugging Face finns redan i .ssh/config.")
+        print("ℹ️ Hugging Face already present in .ssh/config.")
 else:
     with ssh_config.open("w", encoding="utf-8") as f:
         f.write(huggingface_config.strip() + "\n")
-    print("✅ Skapade ny .ssh/config med Hugging Face-inställningar.")
+    print("✅ Created new .ssh/config with Hugging Face entry.")
 
-# Kommentar: Sätt rätt rättigheter (särskilt viktigt på Linux/macOS)
+# Set permissions (important on Unix-like systems)
 try:
     os.chmod(ssh_key, 0o600)
     os.chmod(ssh_config, 0o600)
 except PermissionError:
-    print("⚠️ Kunde inte sätta filrättigheter (ignorerar på Windows).")
+    print("⚠️ Could not set permissions (likely ignored on Windows).")
 
-# Kommentar: Testa anslutningen (visar om SSH fungerar)
-print("\n🚀 Testar SSH-anslutning till Hugging Face...")
+# Test the SSH connection (auto-accepts fingerprint)
+print("\n🚀 Testing SSH connection to Hugging Face...")
 try:
-    result = subprocess.run(["ssh", "-T", "git@huggingface.co"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["ssh", "-o", "StrictHostKeyChecking=no", "-T", "git@huggingface.co"],
+        capture_output=True, text=True
+    )
     print(result.stdout.strip())
     print(result.stderr.strip())
 except Exception as e:
-    print(f"❌ Kunde inte testa SSH: {e}")
+    print(f"❌ SSH test failed: {e}")
 
-# Kommentar: Tips om att lägga till nyckeln om det krävs
-print("\n📌 Kom ihåg att lägga till din **publika** nyckel på:")
-print("   🔗 https://huggingface.co/settings/tokens")
-print(f"   (nyckel finns i: {ssh_key.with_suffix('.pub')})")
+# Reminder to upload public key if not done
+print("\n📌 Remember to upload your **public** key to:")
+print("   🔗 https://huggingface.co/settings/keys")
+print(f"   (your key is at: {ssh_key.with_suffix('.pub')})")
