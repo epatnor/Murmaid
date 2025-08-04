@@ -1,8 +1,8 @@
-# Murmind
+# Murmaid
 
 > 🧠 The whispering voice inside your machine.
 
-**Murmind** is a local-first conversational assistant that speaks back using high-quality text-to-speech – all running offline on your own hardware. It combines:
+**Murmaid** is a local-first conversational assistant that speaks back using high-quality text-to-speech – all running offline on your own hardware. It combines:
 
 - 🧠 Any **local LLM** via [Ollama](https://ollama.com) for intelligent text generation
 - 🔊 **Dia** by [Nari Labs](https://github.com/nari-labs/dia) for realistic voice synthesis
@@ -41,7 +41,7 @@
 
 1. **Clone this repository**
 
-⚠️ On first run, Murmind will automatically download and set up Dia (~6 GB). Make sure you have a stable internet connection.
+⚠️ On first run, Murmaid will automatically download and set up Dia (~6 GB). Make sure you have a stable internet connection.
 
 ```bash
 git clone https://github.com/epatnor/murmind.git
