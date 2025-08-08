@@ -56,16 +56,20 @@ async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)
             content={"error": f"Model '{model}' is not available locally. Please run: ollama pull {model}"}
         )
 
-    # 🧠 Skicka prompt till vald Ollama-modell
     try:
         import ollama
         response = ollama.chat(model=model, messages=[{"role": "user", "content": prompt}])
 
-        # Försök alltid plocka ut content från message-nyckeln
-        if isinstance(response, dict) and "message" in response and "content" in response["message"]:
-            raw_text = response["message"]["content"]
-        else:
-            return JSONResponse(status_code=500, content={"error": "Ollama response missing 'message.content'"})
+        raw_text = None
+        if isinstance(response, dict) and "message" in response:
+            msg = response["message"]
+            if isinstance(msg, dict) and "content" in msg:
+                raw_text = msg["content"]
+            elif hasattr(msg, "content"):
+                raw_text = msg.content
+
+        if not raw_text:
+            return JSONResponse(status_code=500, content={"error": f"Cannot extract content from Ollama response: {response}"})
 
         # Filtrera bort <think>...</think>
         reply_text = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
