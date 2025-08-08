@@ -23,6 +23,7 @@ templates = Jinja2Templates(directory="templates")
 if shutil.which("ollama") is None:
     raise RuntimeError("❌ Ollama is not installed or not in PATH. Install it from https://ollama.com")
 
+
 # 📦 Hämta lokalt installerade Ollama-modeller
 def get_local_ollama_models():
     try:
@@ -37,11 +38,13 @@ def get_local_ollama_models():
         print("⚠️ Failed to query Ollama:", e)
         return []
 
+
 # 🌐 Root-endpoint – laddar UI med lista över modeller
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     models = get_local_ollama_models()
     return templates.TemplateResponse("index.html", {"request": request, "models": models})
+
 
 # 🤖 Hanterar prompt + TTS-svar
 @app.post("/talk")
@@ -55,27 +58,27 @@ async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)
 
     # 🧠 Skicka prompt till vald Ollama-modell
     try:
-            import ollama
-            response = ollama.chat(model=model, messages=[{"role": "user", "content": prompt}])
-        
-            # Försök alltid plocka ut content från message-nyckeln
-            if isinstance(response, dict) and "message" in response and "content" in response["message"]:
-                raw_text = response["message"]["content"]
-            else:
-                return JSONResponse(status_code=500, content={"error": "Ollama response missing 'message.content'"})
-        
-            # Filtrera bort <think>...</think>
-            reply_text = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
-        
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": f"Ollama error: {str(e)}"})
-        
-        
-            # 🔊 Generera ljud via Dia
-            filename = f"audio_{uuid.uuid4().hex}.wav"
-            generate_audio(reply_text, filename)
-        
-            return {"text": reply_text, "audio_url": f"/audio/{filename}"}
+        import ollama
+        response = ollama.chat(model=model, messages=[{"role": "user", "content": prompt}])
+
+        # Försök alltid plocka ut content från message-nyckeln
+        if isinstance(response, dict) and "message" in response and "content" in response["message"]:
+            raw_text = response["message"]["content"]
+        else:
+            return JSONResponse(status_code=500, content={"error": "Ollama response missing 'message.content'"})
+
+        # Filtrera bort <think>...</think>
+        reply_text = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Ollama error: {str(e)}"})
+
+    # 🔊 Generera ljud via Dia
+    filename = f"audio_{uuid.uuid4().hex}.wav"
+    generate_audio(reply_text, filename)
+
+    return {"text": reply_text, "audio_url": f"/audio/{filename}"}
+
 
 # 🎧 Endpoint för ljuduppspelning
 @app.get("/audio/{filename}")
