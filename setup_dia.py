@@ -1,4 +1,4 @@
-# setup_dia.py
+# setup_dia.py (tyst när allt är uppdaterat)
 
 import os
 import subprocess
@@ -11,7 +11,6 @@ MODEL_FILENAME = "dia-v0_1.pth"
 REPO_ID = "nari-labs/Dia-1.6B"
 MODEL_FILE = os.path.join(DIA_DIR, "weights", MODEL_FILENAME)
 
-# Klonar Dia från GitHub om den inte redan finns
 def clone_dia():
     if os.path.exists(DIA_DIR):
         print("✅ Dia already cloned.")
@@ -19,9 +18,8 @@ def clone_dia():
     print("📥 Cloning Dia from GitHub...")
     subprocess.run(["git", "clone", "https://github.com/nari-labs/dia.git", DIA_DIR], check=True)
 
-# Installerar nödvändiga Python-paket direkt (ingen requirements.txt behövs)
 def install_dependencies():
-    print("📦 Installing Dia dependencies manually...")
+    print("📦 Checking Dia dependencies...")
     pip_packages = [
         "torch",
         "torchaudio",
@@ -33,9 +31,24 @@ def install_dependencies():
         "accelerate",
         "huggingface_hub"
     ]
-    subprocess.run([sys.executable, "-m", "pip", "install"] + pip_packages, check=True)
+    dryrun_file = os.path.join(os.getenv("TEMP", "/tmp"), "dia_pip_dryrun.txt")
 
-# Laddar ner Dia-modellen via Hugging Face Hub
+    # Dry-run to see if anything needs to be installed
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "--dry-run"] + pip_packages,
+        stdout=open(dryrun_file, "w"),
+        stderr=subprocess.DEVNULL
+    )
+
+    if os.path.getsize(dryrun_file) == 0:
+        print("✅ Dia dependencies already up to date.")
+    else:
+        print("🔧 Installing/Updating Dia dependencies...")
+        subprocess.run([sys.executable, "-m", "pip", "install"] + pip_packages, check=True)
+
+    if os.path.exists(dryrun_file):
+        os.remove(dryrun_file)
+
 def download_model():
     if os.path.exists(MODEL_FILE):
         print("✅ Dia model already exists.")
@@ -54,7 +67,6 @@ def download_model():
         print(f"👉 https://huggingface.co/{REPO_ID}/blob/main/{MODEL_FILENAME}")
         raise e
 
-# Kör hela setup-processen
 def setup_dia():
     clone_dia()
     install_dependencies()
