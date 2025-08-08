@@ -4,12 +4,13 @@
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
-:: env / paths
+:: paths
 set "VENV_DIR=.venv"
 set "VENV_PY=%VENV_DIR%\Scripts\python.exe"
 set "VENV_PIP=%VENV_DIR%\Scripts\pip.exe"
+set "DRYRUN_JSON=%TEMP%\murmaid_pip_dryrun.json"
 
-:: make pip quieter and stay in venv
+:: pip behavior
 set PIP_DISABLE_PIP_VERSION_CHECK=1
 set PIP_REQUIRE_VIRTUALENV=1
 
@@ -17,26 +18,25 @@ echo ============================================
 echo 🧜‍♀️  Murmaid – Local AI voice assistant
 echo ============================================
 
-:: Pull latest changes from GitHub
 echo 🔄 Checking for updates from GitHub...
 git pull
 
-:: Check if Python is installed
+:: ensure python exists
 where python >nul 2>nul
 if errorlevel 1 (
     echo ❌ Python is not installed or not in PATH.
-    echo ➡️ Please install Python 3.10 or newer from: https://www.python.org/downloads/
+    echo ➡️ Install Python 3.10+ from https://www.python.org/downloads/
     pause
     exit /b
 )
 
-:: Create virtual environment if needed
+:: ensure venv
 if not exist "%VENV_DIR%" (
     echo 🐍 Creating virtual environment...
     python -m venv "%VENV_DIR%"
 )
 
-:: Activate environment
+:: activate venv
 call "%VENV_DIR%\Scripts\activate.bat"
 if errorlevel 1 (
     echo ❌ Failed to activate virtual environment.
@@ -45,31 +45,31 @@ if errorlevel 1 (
 )
 echo ✅ Virtual environment activated
 
-:: Ensure variables point to venv python/pip
-if not exist "%VENV_PY%" (
-    echo ❌ Missing venv python at "%VENV_PY%".
-    pause
-    exit /b
-)
-
-:: Upgrade pip quietly; only announce if version changed
+:: upgrade pip quietly, only announce if changed
 for /f "tokens=2 delims= " %%A in ('"%VENV_PY%" -m pip --version') do set OLD_PIP_VER=%%A
-"%VENV_PY%" -m pip install --upgrade pip -q >"%TEMP%\mur_pip_up.txt" 2>&1
+"%VENV_PY%" -m pip install --upgrade pip -q >nul 2>&1
 for /f "tokens=2 delims= " %%A in ('"%VENV_PY%" -m pip --version') do set NEW_PIP_VER=%%A
 if not "%OLD_PIP_VER%"=="%NEW_PIP_VER%" echo ⬆️  Upgraded pip: %OLD_PIP_VER% → %NEW_PIP_VER%
 
-:: Install deps quietly; print only if something happened
+:: dry-run to detect if anything would be installed/updated
 echo 📦 Installing dependencies...
-"%VENV_PY%" -m pip install -q -r requirements.txt >"%TEMP%\mur_pip_req.txt" 2>&1
-for %%I in ("%TEMP%\mur_pip_req.txt") do set SIZE=%%~zI
-if "%SIZE%"=="0" (
+if exist "%DRYRUN_JSON%" del "%DRYRUN_JSON%" >nul 2>&1
+"%VENV_PY%" -m pip install --dry-run -q --no-input --report "%DRYRUN_JSON%" -r requirements.txt 2>nul
+
+:: Does the report include planned installs/updates?
+:: We'll let PowerShell count the number of "install" actions in the JSON; 0 means up to date.
+for /f "usebackq tokens=* delims=" %%C in (`powershell -NoProfile -Command ^
+  "if (Test-Path '%DRYRUN_JSON%') {try{($json=Get-Content -Raw '%DRYRUN_JSON%'|ConvertFrom-Json); ($json.install|Measure-Object).Count}catch{0}} else {0}"`) do set INSTALL_COUNT=%%C
+
+if "%INSTALL_COUNT%"=="0" (
     echo ✅ Dependencies already up to date.
 ) else (
-    echo 📦 Installed/updated packages:
-    type "%TEMP%\mur_pip_req.txt"
+    echo 🔧 Changes detected: %INSTALL_COUNT% package(s) will be installed/updated.
+    echo ⏳ Running pip install (showing progress)...
+    "%VENV_PY%" -m pip install --no-input -r requirements.txt
 )
 
-:: Conditionally configure SSH for Hugging Face
+:: SSH for Hugging Face
 set "SSH_CONFIG_PATH=%USERPROFILE%\.ssh\config"
 findstr /C:"Host huggingface.co" "%SSH_CONFIG_PATH%" >nul 2>nul
 if errorlevel 1 (
@@ -79,15 +79,13 @@ if errorlevel 1 (
     echo ✅ SSH for Hugging Face already configured.
 )
 
-:: Download and set up Dia (text-to-speech) with venv python
+:: Dia setup (runs under venv python)
 echo 🔧 Setting up Dia (text-to-speech)...
 "%VENV_PY%" setup_dia.py
 
-:: Cleanup
-if exist "%TEMP%\mur_pip_up.txt" del "%TEMP%\mur_pip_up.txt" >nul 2>&1
-if exist "%TEMP%\mur_pip_req.txt" del "%TEMP%\mur_pip_req.txt" >nul 2>&1
+:: cleanup
+if exist "%DRYRUN_JSON%" del "%DRYRUN_JSON%" >nul 2>&1
 
-:: Start the FastAPI app
 echo 🚀 Launching Murmaid on http://127.0.0.1:8000
 uvicorn app:app --reload
 
