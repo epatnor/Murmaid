@@ -4,22 +4,24 @@
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
-# turn off pip's own version nags
-set PIP_DISABLE_PIP_VERSION_CHECK=1
+:: env / paths
+set "VENV_DIR=.venv"
+set "VENV_PY=%VENV_DIR%\Scripts\python.exe"
+set "VENV_PIP=%VENV_DIR%\Scripts\pip.exe"
 
-set VENV_DIR=.venv
-set TMP_PIP_REQ=%TEMP%\murmaid_pip_req.txt
-set TMP_PIP_UPG=%TEMP%\murmaid_pip_upg.txt
+:: make pip quieter and stay in venv
+set PIP_DISABLE_PIP_VERSION_CHECK=1
+set PIP_REQUIRE_VIRTUALENV=1
 
 echo ============================================
 echo 🧜‍♀️  Murmaid – Local AI voice assistant
 echo ============================================
 
-# pull latest
+:: Pull latest changes from GitHub
 echo 🔄 Checking for updates from GitHub...
 git pull
 
-# check python
+:: Check if Python is installed
 where python >nul 2>nul
 if errorlevel 1 (
     echo ❌ Python is not installed or not in PATH.
@@ -28,14 +30,14 @@ if errorlevel 1 (
     exit /b
 )
 
-# venv
-if not exist %VENV_DIR% (
+:: Create virtual environment if needed
+if not exist "%VENV_DIR%" (
     echo 🐍 Creating virtual environment...
-    python -m venv %VENV_DIR%
+    python -m venv "%VENV_DIR%"
 )
 
-# activate venv
-call %VENV_DIR%\Scripts\activate.bat
+:: Activate environment
+call "%VENV_DIR%\Scripts\activate.bat"
 if errorlevel 1 (
     echo ❌ Failed to activate virtual environment.
     pause
@@ -43,51 +45,49 @@ if errorlevel 1 (
 )
 echo ✅ Virtual environment activated
 
-# remember current pip version
-for /f "tokens=2 delims= " %%A in ('python -m pip --version') do set OLD_PIP_VER=%%A
-
-# try upgrade pip quietly; capture any output
-python -m pip install --upgrade pip -q >"%TMP_PIP_UPG%" 2>&1
-
-# read new pip version
-for /f "tokens=2 delims= " %%A in ('python -m pip --version') do set NEW_PIP_VER=%%A
-
-# report only if version actually changed
-if not "%OLD_PIP_VER%"=="%NEW_PIP_VER%" (
-    echo ⬆️  Upgraded pip: %OLD_PIP_VER% → %NEW_PIP_VER%
+:: Ensure variables point to venv python/pip
+if not exist "%VENV_PY%" (
+    echo ❌ Missing venv python at "%VENV_PY%".
+    pause
+    exit /b
 )
 
-# install deps quietly; print only if something changed
-echo 📦 Installing dependencies...
-pip install -q -r requirements.txt >"%TMP_PIP_REQ%" 2>&1
+:: Upgrade pip quietly; only announce if version changed
+for /f "tokens=2 delims= " %%A in ('"%VENV_PY%" -m pip --version') do set OLD_PIP_VER=%%A
+"%VENV_PY%" -m pip install --upgrade pip -q >"%TEMP%\mur_pip_up.txt" 2>&1
+for /f "tokens=2 delims= " %%A in ('"%VENV_PY%" -m pip --version') do set NEW_PIP_VER=%%A
+if not "%OLD_PIP_VER%"=="%NEW_PIP_VER%" echo ⬆️  Upgraded pip: %OLD_PIP_VER% → %NEW_PIP_VER%
 
-for %%I in ("%TMP_PIP_REQ%") do set SIZE=%%~zI
+:: Install deps quietly; print only if something happened
+echo 📦 Installing dependencies...
+"%VENV_PY%" -m pip install -q -r requirements.txt >"%TEMP%\mur_pip_req.txt" 2>&1
+for %%I in ("%TEMP%\mur_pip_req.txt") do set SIZE=%%~zI
 if "%SIZE%"=="0" (
     echo ✅ Dependencies already up to date.
 ) else (
     echo 📦 Installed/updated packages:
-    type "%TMP_PIP_REQ%"
+    type "%TEMP%\mur_pip_req.txt"
 )
 
-# ssh config for huggingface (only if missing)
+:: Conditionally configure SSH for Hugging Face
 set "SSH_CONFIG_PATH=%USERPROFILE%\.ssh\config"
 findstr /C:"Host huggingface.co" "%SSH_CONFIG_PATH%" >nul 2>nul
 if errorlevel 1 (
     echo 🔐 SSH config for Hugging Face not found – running setup...
-    python setup_ssh.py
+    "%VENV_PY%" setup_ssh.py
 ) else (
     echo ✅ SSH for Hugging Face already configured.
 )
 
-# dia tts setup (will be quiet unless it outputs something meaningful)
+:: Download and set up Dia (text-to-speech) with venv python
 echo 🔧 Setting up Dia (text-to-speech)...
-python setup_dia.py
+"%VENV_PY%" setup_dia.py
 
-# cleanup temp files
-if exist "%TMP_PIP_REQ%" del "%TMP_PIP_REQ%" >nul 2>&1
-if exist "%TMP_PIP_UPG%" del "%TMP_PIP_UPG%" >nul 2>&1
+:: Cleanup
+if exist "%TEMP%\mur_pip_up.txt" del "%TEMP%\mur_pip_up.txt" >nul 2>&1
+if exist "%TEMP%\mur_pip_req.txt" del "%TEMP%\mur_pip_req.txt" >nul 2>&1
 
-# launch app
+:: Start the FastAPI app
 echo 🚀 Launching Murmaid on http://127.0.0.1:8000
 uvicorn app:app --reload
 
