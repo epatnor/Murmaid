@@ -8,6 +8,7 @@ import subprocess
 import uuid
 import shutil
 import os
+import re
 
 from dia_wrapper import generate_audio
 
@@ -56,10 +57,21 @@ async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)
     try:
         import ollama
         response = ollama.chat(model=model, messages=[{"role": "user", "content": prompt}])
-        if isinstance(response, dict) and "message" in response:
-            reply_text = response["message"]["content"]
+
+        # Plocka ut text på ett säkrare sätt
+        if isinstance(response, dict):
+            if "message" in response and "content" in response["message"]:
+                raw_text = response["message"]["content"]
+            elif "content" in response:
+                raw_text = response["content"]
+            else:
+                return JSONResponse(status_code=500, content={"error": f"Unexpected Ollama response: {response}"})
         else:
-            return JSONResponse(status_code=500, content={"error": f"Invalid response from Ollama: {response}"})
+            return JSONResponse(status_code=500, content={"error": f"Unexpected Ollama response: {response}"})
+
+        # Rensa bort <think>...</think>
+        reply_text = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Ollama error: {str(e)}"})
 
