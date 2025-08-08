@@ -12,19 +12,15 @@ import re
 
 from dia_wrapper import generate_audio
 
-# 🚀 Start FastAPI
 app = FastAPI()
 
-# 🔧 Static & templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# ✅ Kontrollera att Ollama finns
 if shutil.which("ollama") is None:
     raise RuntimeError("❌ Ollama is not installed or not in PATH. Install it from https://ollama.com")
 
 
-# 📦 Hämta lokalt installerade Ollama-modeller
 def get_local_ollama_models():
     try:
         result = subprocess.run(["ollama", "list"], capture_output=True, text=True)
@@ -39,14 +35,12 @@ def get_local_ollama_models():
         return []
 
 
-# 🌐 Root-endpoint – laddar UI med lista över modeller
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     models = get_local_ollama_models()
     return templates.TemplateResponse("index.html", {"request": request, "models": models})
 
 
-# 🤖 Hanterar prompt + TTS-svar
 @app.post("/talk")
 async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)):
     available_models = get_local_ollama_models()
@@ -61,6 +55,8 @@ async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)
         response = ollama.chat(model=model, messages=[{"role": "user", "content": prompt}])
 
         raw_text = None
+
+        # Fall 1: Dict med dict som message
         if isinstance(response, dict) and "message" in response:
             msg = response["message"]
             if isinstance(msg, dict) and "content" in msg:
@@ -68,8 +64,19 @@ async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)
             elif hasattr(msg, "content"):
                 raw_text = msg.content
 
+        # Fall 2: Objekt med .message
+        elif hasattr(response, "message"):
+            msg = response.message
+            if isinstance(msg, dict) and "content" in msg:
+                raw_text = msg["content"]
+            elif hasattr(msg, "content"):
+                raw_text = msg.content
+
         if not raw_text:
-            return JSONResponse(status_code=500, content={"error": f"Cannot extract content from Ollama response: {response}"})
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"Cannot extract content from Ollama response: {response}"}
+            )
 
         # Filtrera bort <think>...</think>
         reply_text = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
@@ -77,14 +84,12 @@ async def talk(request: Request, prompt: str = Form(...), model: str = Form(...)
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Ollama error: {str(e)}"})
 
-    # 🔊 Generera ljud via Dia
     filename = f"audio_{uuid.uuid4().hex}.wav"
     generate_audio(reply_text, filename)
 
     return {"text": reply_text, "audio_url": f"/audio/{filename}"}
 
 
-# 🎧 Endpoint för ljuduppspelning
 @app.get("/audio/{filename}")
 async def get_audio(filename: str):
     filepath = os.path.join(".", filename)
